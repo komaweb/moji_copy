@@ -201,27 +201,33 @@ function render() {
   }
 
   items.forEach((text, index) => {
-    const item = document.createElement("button");
+    const item = document.createElement("div");
     item.className = "item";
-    item.type = "button";
-    item.textContent = text;
+    item.setAttribute("role", "button");
+    item.setAttribute("tabindex", "0");
 
-    item.addEventListener("click", () => copyText(text));
+    const textContent = document.createElement("div");
+    textContent.textContent = text;
+
+    textContent.addEventListener("click", () => copyText(text));
 
     const menu = document.createElement("button");
     menu.className = "menu";
     menu.type = "button";
     menu.textContent = "⋯";
     menu.title = "編集";
+
     menu.addEventListener("click", (event) => {
       event.stopPropagation();
       openEditor(index);
     });
 
+    item.appendChild(textContent);
     item.appendChild(menu);
     list.appendChild(item);
   });
 }
+ 
 
 async function copyText(text) {
   try {
