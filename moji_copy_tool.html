@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>文字列コピーツール</title>
+<style>
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 16px;
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+    background: #f5f5f5;
+    color: #222;
+  }
+
+  .app {
+    max-width: 700px;
+    margin: 0 auto;
+  }
+
+  header {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+
+  button {
+    font: inherit;
+    border: 1px solid #ccc;
+    border-radius: 10px;
+    background: white;
+    color: #222;
+    cursor: pointer;
+  }
+
+  #addBtn {
+    flex: 1;
+    padding: 13px 16px;
+    font-weight: 600;
+  }
+
+  #addBtn:active,
+  .item:active {
+    transform: scale(0.99);
+  }
+
+  .item {
+    position: relative;
+    width: 100%;
+    min-height: 58px;
+    margin-bottom: 10px;
+    padding: 15px 48px 15px 16px;
+    text-align: left;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.5;
+    box-shadow: 0 1px 3px rgba(0,0,0,.05);
+  }
+
+  .item .menu {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #888;
+    font-size: 20px;
+    z-index: 2;
+  }
+
+  .empty {
+    padding: 50px 20px;
+    text-align: center;
+    color: #999;
+    font-size: 14px;
+  }
+
+  #toast {
+    position: fixed;
+    left: 50%;
+    bottom: 24px;
+    transform: translateX(-50%) translateY(20px);
+    padding: 10px 16px;
+    border-radius: 999px;
+    background: #222;
+    color: white;
+    font-size: 14px;
+    opacity: 0;
+    pointer-events: none;
+    transition: .2s;
+  }
+
+  #toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  dialog {
+    width: min(92vw, 560px);
+    border: 0;
+    border-radius: 14px;
+    padding: 20px;
+    box-shadow: 0 10px 40px rgba(0,0,0,.2);
+  }
+
+  dialog::backdrop {
+    background: rgba(0,0,0,.35);
+  }
+
+  dialog h2 {
+    margin: 0 0 14px;
+    font-size: 18px;
+  }
+
+  textarea {
+    width: 100%;
+    min-height: 180px;
+    resize: vertical;
+    padding: 12px;
+    font: inherit;
+    line-height: 1.5;
+    border: 1px solid #ccc;
+    border-radius: 9px;
+  }
+
+  .dialog-buttons {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .dialog-buttons button {
+    flex: 1;
+    padding: 11px;
+  }
+
+  #saveBtn {
+    background: #222;
+    color: white;
+    border-color: #222;
+  }
+
+  #deleteBtn {
+    color: #c33;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <button id="addBtn">＋ 文字列を追加</button>
+  </header>
+  <main id="list"></main>
+</div>
+
+<div id="toast">コピーしました</div>
+
+<dialog id="editor">
+  <h2 id="dialogTitle">文字列を追加</h2>
+  <textarea id="textInput" placeholder="コピーしたい文字列を入力"></textarea>
+  <div class="dialog-buttons">
+    <button id="cancelBtn">キャンセル</button>
+    <button id="deleteBtn" hidden>削除</button>
+    <button id="saveBtn">保存</button>
+  </div>
+</dialog>
+
+<script>
+const STORAGE_KEY = "simple-copy-tool-v1";
+
+let items = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+let editingIndex = null;
+
+const list = document.getElementById("list");
+const editor = document.getElementById("editor");
+const textInput = document.getElementById("textInput");
+const dialogTitle = document.getElementById("dialogTitle");
+const deleteBtn = document.getElementById("deleteBtn");
+const toast = document.getElementById("toast");
+
+function saveData() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+}
+
+function render() {
+  list.innerHTML = "";
+
+  if (items.length === 0) {
+    list.innerHTML = '<div class="empty">「文字列を追加」から登録してね</div>';
+    return;
+  }
+
+  items.forEach((text, index) => {
+    const item = document.createElement("button");
+    item.className = "item";
+    item.type = "button";
+    item.textContent = text;
+
+    item.addEventListener("click", () => copyText(text));
+
+    const menu = document.createElement("button");
+    menu.className = "menu";
+    menu.type = "button";
+    menu.textContent = "⋯";
+    menu.title = "編集";
+    menu.addEventListener("click", (event) => {
+      event.stopPropagation();
+      openEditor(index);
+    });
+
+    item.appendChild(menu);
+    list.appendChild(item);
+  });
+}
+
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    const area = document.createElement("textarea");
+    area.value = text;
+    document.body.appendChild(area);
+    area.select();
+    document.execCommand("copy");
+    area.remove();
+  }
+
+  toast.classList.add("show");
+  clearTimeout(window.toastTimer);
+  window.toastTimer = setTimeout(() => {
+    toast.classList.remove("show");
+  }, 900);
+}
+
+function openEditor(index = null) {
+  editingIndex = index;
+  textInput.value = index === null ? "" : items[index];
+  dialogTitle.textContent = index === null ? "文字列を追加" : "文字列を編集";
+  deleteBtn.hidden = index === null;
+  editor.showModal();
+
+  setTimeout(() => textInput.focus(), 100);
+}
+
+document.getElementById("addBtn").addEventListener("click", () => openEditor());
+
+document.getElementById("cancelBtn").addEventListener("click", () => {
+  editor.close();
+});
+
+document.getElementById("saveBtn").addEventListener("click", () => {
+  const text = textInput.value;
+
+  if (!text.trim()) {
+    editor.close();
+    return;
+  }
+
+  if (editingIndex === null) {
+    items.push(text);
+  } else {
+    items[editingIndex] = text;
+  }
+
+  saveData();
+  render();
+  editor.close();
+});
+
+deleteBtn.addEventListener("click", () => {
+  if (editingIndex === null) return;
+
+  if (confirm("この文字列を削除しますか？")) {
+    items.splice(editingIndex, 1);
+    saveData();
+    render();
+    editor.close();
+  }
+});
+
+editor.addEventListener("click", (event) => {
+  if (event.target === editor) editor.close();
+});
+
+render();
+</script>
+</body>
+</html>
